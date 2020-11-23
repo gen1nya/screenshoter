@@ -1,11 +1,14 @@
+import entities.Configuration
 import io.reactivex.rxjava3.core.Observable
 import io.reactivex.rxjava3.disposables.Disposable
 import io.reactivex.rxjava3.schedulers.Schedulers
+import org.yaml.snakeyaml.Yaml
 import java.awt.Rectangle
 import java.awt.Robot
 import java.awt.Toolkit
 import java.io.File
 import java.io.OutputStream
+import java.io.StringWriter
 import java.util.*
 import java.util.concurrent.TimeUnit
 import javax.imageio.ImageIO
@@ -13,10 +16,9 @@ import javax.imageio.ImageIO
 object Screenshot {
 
     private var disposable: Disposable? = null
-    private const val DELAY_SECONDS = 5L
-    private const val SCREENSHOTS_ROOT_DIRECTORY = "C:\\\\Users\\user\\"
+
     private const val SCREENSHOTS_DIRECTORY_PREFIX = "screenshots_"
-    private const val CONFIG = "screenshoter.cnf"
+    private const val CONFIG = "screenshoter.yaml"
     private const val SIGNATURE_FILE = "signature.txt"
 
     @JvmStatic
@@ -26,13 +28,14 @@ object Screenshot {
         println()
         println()
 
-        val directory = getScreenshotDirectory()
+        val config = getOrCreateConfig()
+        val directory = getScreenshotDirectory(config)
         val path = directory.directory
         val signatureIO = directory.signatureStream
 
         println("Screenshoting is started...")
 
-        disposable = Observable.interval(DELAY_SECONDS, TimeUnit.SECONDS)
+        disposable = Observable.interval(config.screenshotInterval, TimeUnit.SECONDS)
             .map {
                 val r = Robot()
 
@@ -56,43 +59,59 @@ object Screenshot {
         while (true) { }
     }
 
-    private fun getScreenshotDirectory(): ScreenshotDirectory {
-        val configFile = File("$SCREENSHOTS_ROOT_DIRECTORY$CONFIG")
-        if (!configFile.exists()) configFile.createNewFile()
-        val lastScreenshotsDirectory = configFile.readText()
+    private fun getOrCreateConfig(): Configuration {
+        val configFile = File(CONFIG)
+        val configuration: Configuration
+        if (!configFile.exists()) {
+            configuration = Configuration()
+            configFile.createNewFile()
+            writeConfigToFile(configuration)
+        } else {
+            configuration = Yaml().load(configFile.inputStream())
+        }
+        return configuration
+    }
 
-        val directory = if (lastScreenshotsDirectory.isBlank() || !File(lastScreenshotsDirectory).exists()) {
+    private fun getScreenshotDirectory(config: Configuration): ScreenshotDirectory {
+        val directory = if (config.lastDir.isBlank() || !File(config.lastDir).exists()) {
             createNewDirectory()
         } else {
-            print("Do you want to continue writing into $lastScreenshotsDirectory? (y/n): ")
+            print("Do you want to continue writing into ${config.lastDir}? (y/n): ")
             var useOldDirectory: Boolean? = null
             while (useOldDirectory == null) {
-                when (readLine()?.toLowerCase()) {
+                when (readLine()?.toLowerCase()?.trim()) {
                     "y", "yes" -> useOldDirectory = true
                     "n", "no" -> useOldDirectory = false
                 }
             }
             if (useOldDirectory) {
-                val oldSignatureFile = File("$lastScreenshotsDirectory$SIGNATURE_FILE")
+                val oldSignatureFile = File("${config.lastDir}$SIGNATURE_FILE")
                 val oldSignatureStr = oldSignatureFile.readText()
 
                 val oldSignatureIO = oldSignatureFile.outputStream().apply {
                     write(oldSignatureStr.toByteArray())
                 }
 
-                ScreenshotDirectory(directory = lastScreenshotsDirectory, signatureStream = oldSignatureIO)
+                ScreenshotDirectory(directory = config.lastDir, signatureStream = oldSignatureIO)
             } else {
                 createNewDirectory()
             }
         }
-
-        configFile.outputStream().write(directory.directory.toByteArray())
-
+        config.lastDir = directory.directory
+        writeConfigToFile(config)
         return directory
     }
 
+    private fun writeConfigToFile(config: Configuration) {
+        val configFile = File(CONFIG)
+        val yamlConfig = Yaml()
+        val writer = StringWriter()
+        yamlConfig.dump(config, writer)
+        configFile.writeText(writer.toString())
+    }
+
     private fun createNewDirectory(): ScreenshotDirectory {
-        val path = "$SCREENSHOTS_ROOT_DIRECTORY$SCREENSHOTS_DIRECTORY_PREFIX${System.currentTimeMillis()}\\"
+        val path = "$SCREENSHOTS_DIRECTORY_PREFIX${System.currentTimeMillis()}\\"
         val screenshotsSignaturePath = "$path$SIGNATURE_FILE"
         val directory = File(path)
 
