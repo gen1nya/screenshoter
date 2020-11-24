@@ -20,6 +20,7 @@ object Screenshot {
     private const val SCREENSHOTS_DIRECTORY_PREFIX = "screenshots_"
     private const val CONFIG = "screenshoter.yaml"
     private const val SIGNATURE_FILE = "signature.txt"
+    private const val NAMES_FILE = "names.txt"
 
     @JvmStatic
     fun main(args: Array<String>) {
@@ -32,6 +33,7 @@ object Screenshot {
         val directory = getScreenshotDirectory(config)
         val path = directory.directory
         val signatureIO = directory.signatureStream
+        val namesIO = directory.namesStream
 
         println("Screenshoting is started...")
 
@@ -45,7 +47,10 @@ object Screenshot {
 
                 val capture = Rectangle(Toolkit.getDefaultToolkit().screenSize)
                 val image = r.createScreenCapture(capture)
-                ImageIO.write(image, "jpg", File(screenshotPath))
+                val screenshotFile = File(screenshotPath)
+                ImageIO.write(image, "jpg", screenshotFile)
+
+                namesIO.write("file \'${screenshotFile.absolutePath}\'\n".toByteArray())
                 time
             }
             .subscribeOn(Schedulers.io())
@@ -92,7 +97,14 @@ object Screenshot {
                     write(oldSignatureStr.toByteArray())
                 }
 
-                ScreenshotDirectory(directory = config.lastDir, signatureStream = oldSignatureIO)
+                val oldNamesFile = File("${config.lastDir}$NAMES_FILE")
+                val oldNamesStr = oldNamesFile.readText()
+
+                val oldNamesIO = oldNamesFile.outputStream().apply {
+                    write(oldNamesStr.toByteArray())
+                }
+
+                ScreenshotDirectory(directory = config.lastDir, signatureStream = oldSignatureIO, namesStream = oldNamesIO)
             } else {
                 createNewDirectory()
             }
@@ -113,6 +125,7 @@ object Screenshot {
     private fun createNewDirectory(): ScreenshotDirectory {
         val path = "$SCREENSHOTS_DIRECTORY_PREFIX${System.currentTimeMillis()}\\"
         val screenshotsSignaturePath = "$path$SIGNATURE_FILE"
+        val namesPath = "$path$NAMES_FILE"
         val directory = File(path)
 
         if (!directory.exists()) {
@@ -122,8 +135,15 @@ object Screenshot {
         val signatureFile = File(screenshotsSignaturePath)
         val signatureIO = signatureFile.outputStream().getDefault()
 
-        return ScreenshotDirectory(directory = path, signatureStream = signatureIO)
+        val namesFile = File(namesPath)
+        val namesIO = namesFile.outputStream().forFfmpeg()
+
+        return ScreenshotDirectory(directory = path, signatureStream = signatureIO, namesStream = namesIO)
     }
 
-    data class ScreenshotDirectory(val directory: String, val signatureStream: OutputStream)
+    data class ScreenshotDirectory(
+        val directory: String,
+        val signatureStream: OutputStream,
+        val namesStream: OutputStream
+    )
 }

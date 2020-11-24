@@ -1,5 +1,7 @@
 import java.io.OutputStream
 
+fun OutputStream.forFfmpeg() = this.apply { write("# use this for generate timelapse video via ffmpeg\n\n".toByteArray()) }
+
 fun OutputStream.getDefault() = this.apply { write("$generalPrefix\n\n".toByteArray()) }
 val generalPrefix = """
                                        _,,---.)\__
