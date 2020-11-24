@@ -14,7 +14,7 @@ Generated file will be placed in build/libs.
 java -jar SCREENSHOTER-1.1.jar
 ```
 
-Captured screenshots and signature will be palced in screenshots_tiemstamp folder.
+Captured screenshots and signature will be placed in screenshots_tiemstamp folder.
 
 ## Configuration:
 
