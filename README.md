@@ -8,6 +8,8 @@ Run gradle "jar" task.
 
 Generated file will be placed in build/libs.
 
+Alternatively, you can just download the build:
+https://github.com/gen1nya/screenshoter/releases
 ## How to use:
 
 ```
@@ -27,10 +29,12 @@ After first run app also generate configuration file screenshoter.yaml with cont
 If you want to change interval betveen capturing - change ```screenshotInterval``` field.
 
 ## Generating timelapse video from screenshots:
+### Via ffmpeg (yes, ffmpeg required):
 
 Run in screenshots folder:
+
 ```
 ffmpeg -r 5 -f concat -safe 0 -i names.txt -vsync vfr output.mp4
 ```
 
--r - images per second.
+```-r``` - images per second.
